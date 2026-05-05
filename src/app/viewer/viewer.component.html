@@ -4,9 +4,7 @@
     <h6 class="mb-3">Generating PDF...</h6>
 
     <div class="progress mb-2" style="height: 20px;">
-      <div 
-        class="progress-bar progress-bar-striped progress-bar-animated"
-        role="progressbar"
+      <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
         [style.width.%]="progress">
         {{ progress }}%
       </div>
@@ -70,6 +68,10 @@
         [disabled]="!isPdfLoaded" />
       <button class="btn btn-outline-danger btn-sm" (click)="deleteSelectedText()" [disabled]="!isPdfLoaded">
         Delete
+      </button>
+
+      <button class="btn btn-success btn-sm" [disabled]="!isPdfLoaded">
+        Save PDF
       </button>
 
       <button class="btn btn-success btn-sm d-flex align-items-center gap-2" (click)="downloadPdf()"

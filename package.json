@@ -21,6 +21,7 @@
     "bootstrap": "5.2",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^3.11.174",
     "rxjs": "~7.5.0",
     "tslib": "^2.3.0",

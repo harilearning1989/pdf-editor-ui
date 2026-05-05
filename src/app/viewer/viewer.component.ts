@@ -2,6 +2,8 @@ import { Component, ElementRef, ViewChild } from '@angular/core';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { PDFDocument, rgb } from 'pdf-lib';
+import { FontConfig, FONTS } from '../constants/pdf-constants';
 
 // ✅ Set worker
 (pdfjsLib as any).GlobalWorkerOptions.workerSrc =
@@ -23,18 +25,7 @@ export class ViewerComponent {
   originalFileName: string = 'edited';
   isPdfLoaded = false;
   loadedFonts = new Set<string>();
-  fonts = [
-  { name: 'Arial', type: 'system' },
-  { name: 'Times New Roman', type: 'system' },
-  { name: 'Courier New', type: 'system' },
-  { name: 'Roboto', type: 'google' },
-  { name: 'Poppins', type: 'google' },
-  { name: 'Open Sans', type: 'google' },
-  { name: 'Lato', type: 'google' },
-  { name: 'Montserrat', type: 'google' },
-  { name: 'Raleway', type: 'google' },
-  { name: 'Nunito', type: 'google' }
-];
+  fonts: FontConfig[] = FONTS;
 
   pageElements: HTMLElement[] = [];
   fontSizes = Array.from({ length: 17 }, (_, i) => i + 8); // 8 → 24
@@ -50,81 +41,81 @@ export class ViewerComponent {
 
   currentFont: string = 'Arial';
 
+  originalPdfBytes: Uint8Array | null = null;
+
   constructor() { }
 
   ngOnInit() {
-  this.systemFonts = this.fonts.filter(f => f.type === 'system');
-  this.googleFonts = this.fonts.filter(f => f.type === 'google');
-}
+    this.systemFonts = this.fonts.filter(f => f.type === 'system');
+    this.googleFonts = this.fonts.filter(f => f.type === 'google');
+  }
 
-enableTextEdit(textDiv: HTMLElement) {
+  enableTextEdit(textDiv: HTMLElement) {
+    const currentText = textDiv.innerText;
 
-  const currentText = textDiv.innerText;
+    const parent = textDiv.parentElement;
+    if (!parent) return;
 
-  const parent = textDiv.parentElement;
-  if (!parent) return;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentText;
 
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.value = currentText;
+    // copy styles
+    input.style.position = 'absolute';
+    input.style.left = textDiv.style.left;
+    input.style.top = textDiv.style.top;
 
-  // copy styles
-  input.style.position = 'absolute';
-  input.style.left = textDiv.style.left;
-  input.style.top = textDiv.style.top;
+    input.style.fontSize = textDiv.style.fontSize;
+    input.style.fontFamily = textDiv.style.fontFamily;
+    input.style.color = textDiv.style.color;
+    input.style.fontWeight = textDiv.style.fontWeight;
+    input.style.fontStyle = textDiv.style.fontStyle;
 
-  input.style.fontSize = textDiv.style.fontSize;
-  input.style.fontFamily = textDiv.style.fontFamily;
-  input.style.color = textDiv.style.color;
-  input.style.fontWeight = textDiv.style.fontWeight;
-  input.style.fontStyle = textDiv.style.fontStyle;
+    input.style.border = '1px solid black';
+    input.style.padding = '2px';
 
-  input.style.border = '1px solid black';
-  input.style.padding = '2px';
+    // replace text with input
+    parent.replaceChild(input, textDiv);
 
-  // replace text with input
-  parent.replaceChild(input, textDiv);
+    input.focus();
 
-  input.focus();
+    // 🔥 Save on blur
+    input.onblur = () => {
+      const newValue = input.value.trim();
 
-  // 🔥 Save on blur
-  input.onblur = () => {
-    const newValue = input.value.trim();
+      parent.removeChild(input);
 
-    parent.removeChild(input);
+      if (!newValue) return;
 
-    if (!newValue) return;
+      const newTextDiv = this.createTextElement(
+        newValue,
+        parseFloat(input.style.left),
+        parseFloat(input.style.top),
+        parent
+      );
 
-    const newTextDiv = this.createTextElement(
-      newValue,
-      parseFloat(input.style.left),
-      parseFloat(input.style.top),
-      parent
-    );
+      // 🔥 reapply styles
+      newTextDiv.style.fontSize = input.style.fontSize;
+      newTextDiv.style.fontFamily = input.style.fontFamily;
+      newTextDiv.style.color = input.style.color;
+      newTextDiv.style.fontWeight = input.style.fontWeight;
+      newTextDiv.style.fontStyle = input.style.fontStyle;
 
-    // 🔥 reapply styles
-    newTextDiv.style.fontSize = input.style.fontSize;
-    newTextDiv.style.fontFamily = input.style.fontFamily;
-    newTextDiv.style.color = input.style.color;
-    newTextDiv.style.fontWeight = input.style.fontWeight;
-    newTextDiv.style.fontStyle = input.style.fontStyle;
+      parent.appendChild(newTextDiv);
 
-    parent.appendChild(newTextDiv);
+      this.makeDraggable(newTextDiv);
+    };
 
-    this.makeDraggable(newTextDiv);
-  };
-
-  // 🔥 Save on Enter key
-  input.onkeydown = (e: any) => {
-    if (e.key === 'Enter') {
-      input.blur();
-    }
-  };
-}
+    // 🔥 Save on Enter key
+    input.onkeydown = (e: any) => {
+      if (e.key === 'Enter') {
+        input.blur();
+      }
+    };
+  }
 
   async onFileSelected(event: any) {
     const file = event.target.files[0];
-
     if (!file) return;
 
     // 🔥 Validate file type
@@ -134,7 +125,6 @@ enableTextEdit(textDiv: HTMLElement) {
       this.isPdfLoaded = false;
       return;
     }
-
     // ✅ Valid PDF
     this.isPdfLoaded = true;
 
@@ -148,7 +138,6 @@ enableTextEdit(textDiv: HTMLElement) {
       const typedArray = new Uint8Array(fileReader.result as ArrayBuffer);
       await this.loadPdf(typedArray);
     };
-
     fileReader.readAsArrayBuffer(file);
   }
 
@@ -264,47 +253,47 @@ enableTextEdit(textDiv: HTMLElement) {
   }
 
   createTextElement(
-  value: string,
-  x: number,
-  y: number,
-  wrapper: HTMLElement
-): HTMLElement {
+    value: string,
+    x: number,
+    y: number,
+    wrapper: HTMLElement
+  ): HTMLElement {
 
-  const textDiv = document.createElement('div');
-  textDiv.innerText = value;
+    const textDiv = document.createElement('div');
+    textDiv.innerText = value;
 
-  // 📍 Position
-  textDiv.style.position = 'absolute';
-  textDiv.style.left = x + 'px';
-  textDiv.style.top = y + 'px';
+    // 📍 Position
+    textDiv.style.position = 'absolute';
+    textDiv.style.left = x + 'px';
+    textDiv.style.top = y + 'px';
 
-  // 🎨 Default styles
-  textDiv.style.fontSize = '16px';
-  textDiv.style.fontFamily = this.currentFont || 'Arial';
-  textDiv.style.color = 'black';
-  textDiv.style.fontWeight = 'normal';
-  textDiv.style.fontStyle = 'normal';
+    // 🎨 Default styles
+    textDiv.style.fontSize = '16px';
+    textDiv.style.fontFamily = this.currentFont || 'Arial';
+    textDiv.style.color = 'black';
+    textDiv.style.fontWeight = 'normal';
+    textDiv.style.fontStyle = 'normal';
 
-  // UX
-  textDiv.style.cursor = 'move';
-  textDiv.style.userSelect = 'none';
-  textDiv.style.padding = '2px';
-  textDiv.style.minWidth = '20px';
+    // UX
+    textDiv.style.cursor = 'move';
+    textDiv.style.userSelect = 'none';
+    textDiv.style.padding = '2px';
+    textDiv.style.minWidth = '20px';
 
-  // 🖱️ SELECT TEXT
-  textDiv.onclick = (event: any) => {
-    event.stopPropagation();
-    this.selectText(textDiv);
-  };
+    // 🖱️ SELECT TEXT
+    textDiv.onclick = (event: any) => {
+      event.stopPropagation();
+      this.selectText(textDiv);
+    };
 
-  // ✏️ DOUBLE CLICK TO EDIT
-  textDiv.ondblclick = (event: any) => {
-    event.stopPropagation();
-    this.enableTextEdit(textDiv);
-  };
+    // ✏️ DOUBLE CLICK TO EDIT
+    textDiv.ondblclick = (event: any) => {
+      event.stopPropagation();
+      this.enableTextEdit(textDiv);
+    };
 
-  return textDiv;
-}
+    return textDiv;
+  }
 
   // 🎯 Page selection
   selectPage(index: number) {
@@ -421,45 +410,45 @@ enableTextEdit(textDiv: HTMLElement) {
   }
 
   async downloadPdf() {
-  this.isDownloading = true;
+    this.isDownloading = true;
 
-  const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdf = new jsPDF('p', 'mm', 'a4');
 
-  const container = this.pageContainer.nativeElement;
-  const pages = container.children;
+    const container = this.pageContainer.nativeElement;
+    const pages = container.children;
 
-  this.totalPages = pages.length;
-  this.progress = 0;
+    this.totalPages = pages.length;
+    this.progress = 0;
 
-  try {
-    for (let i = 0; i < pages.length; i++) {
-      const pageElement = pages[i];
+    try {
+      for (let i = 0; i < pages.length; i++) {
+        const pageElement = pages[i];
 
-      const canvas = await html2canvas(pageElement);
-      const imgData = canvas.toDataURL('image/png');
+        const canvas = await html2canvas(pageElement);
+        const imgData = canvas.toDataURL('image/png');
 
-      const imgWidth = 210;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        const imgWidth = 210;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-      if (i > 0) {
-        pdf.addPage();
+        if (i > 0) {
+          pdf.addPage();
+        }
+
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+
+        // ✅ update progress
+        this.progress = Math.round(((i + 1) / this.totalPages) * 100);
       }
 
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      const timestamp = this.getTimestamp();
+      const fileName = `${this.originalFileName}_${timestamp}.pdf`;
 
-      // ✅ update progress
-      this.progress = Math.round(((i + 1) / this.totalPages) * 100);
+      pdf.save(fileName);
+
+    } finally {
+      this.isDownloading = false;
     }
-
-    const timestamp = this.getTimestamp();
-    const fileName = `${this.originalFileName}_${timestamp}.pdf`;
-
-    pdf.save(fileName);
-
-  } finally {
-    this.isDownloading = false;
   }
-}
 
   getTimestamp(): string {
     const now = new Date();
@@ -499,25 +488,31 @@ enableTextEdit(textDiv: HTMLElement) {
     console.log(`Font loaded: ${fontName}`);
   }
   changeFontFamily(event: any) {
-  const fontName = event.target.value;
+    const fontName = event.target.value;
 
-  // 🔥 store selected font (for new text)
-  this.currentFont = fontName;
+    // 🔥 store selected font (for new text)
+    this.currentFont = fontName;
 
-  // 🔍 find font config
-  const font = this.fonts.find(f => f.name === fontName);
+    // 🔍 find font config
+    const font = this.fonts.find(f => f.name === fontName);
 
-  // 🔥 load dynamically if needed
-  if (font?.type === 'google') {
-    this.loadFont(fontName);
+    // 🔥 load dynamically if needed
+    if (font?.type === 'google') {
+      this.loadFont(fontName);
+    }
+
+    // 🎯 apply to selected text (if exists)
+    if (this.selectedTextElement) {
+      this.selectedTextElement.style.fontFamily = `'${fontName}', sans-serif`;
+    }
   }
 
-  // 🎯 apply to selected text (if exists)
-  if (this.selectedTextElement) {
-    this.selectedTextElement.style.fontFamily = `'${fontName}', sans-serif`;
-  }
-}
+  hexToRgb(hex: string) {
+    const r = parseInt(hex.substring(1, 3), 16) / 255;
+    const g = parseInt(hex.substring(3, 5), 16) / 255;
+    const b = parseInt(hex.substring(5, 7), 16) / 255;
 
-  
+    return rgb(r, g, b);
+  }
 
 }
