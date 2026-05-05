@@ -1,0 +1,103 @@
+<div *ngIf="isDownloading" class="overlay">
+  <div class="progress-card text-center p-4 shadow rounded bg-white">
+
+    <h6 class="mb-3">Generating PDF...</h6>
+
+    <div class="progress mb-2" style="height: 20px;">
+      <div 
+        class="progress-bar progress-bar-striped progress-bar-animated"
+        role="progressbar"
+        [style.width.%]="progress">
+        {{ progress }}%
+      </div>
+    </div>
+
+    <small class="text-muted">
+      Page {{ (progress * totalPages / 100) | number:'1.0-0' }} of {{ totalPages }}
+    </small>
+
+  </div>
+</div>
+
+<div class="container-fluid vh-100 d-flex flex-column overflow-hidden">
+
+  <!-- 🔝 TOP TOOLBAR -->
+  <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm px-3">
+    <span class="navbar-brand fw-bold">PDF Editor</span>
+
+    <div class="d-flex gap-2 ms-3 flex-wrap">
+
+      <label class="btn btn-primary btn-sm mb-0">
+        Upload PDF
+        <input type="file" (change)="onFileSelected($event)" accept="application/pdf" hidden />
+      </label>
+
+      <button class="btn btn-outline-secondary btn-sm" [disabled]="!isPdfLoaded" (click)="enableTextMode()">
+        Add Text
+      </button>
+
+      <button class="btn btn-outline-secondary btn-sm" [disabled]="!isPdfLoaded" (click)="toggleBold()">
+        <b>B</b>
+      </button>
+
+      <button class="btn btn-outline-secondary btn-sm" [disabled]="!isPdfLoaded" (click)="toggleItalic()">
+        <i>I</i>
+      </button>
+
+      <select class="form-select form-select-sm w-auto" (change)="changeFontSize($event)" [disabled]="!isPdfLoaded"
+        [(ngModel)]="selectedFontSize">
+        <option *ngFor="let size of fontSizes" [value]="size + 'px'">
+          {{ size }}
+        </option>
+      </select>
+
+      <select class="form-select form-select-sm w-auto" (change)="changeFontFamily($event)" [disabled]="!isPdfLoaded">
+        <optgroup label="System Fonts">
+          <option *ngFor="let f of systemFonts" [value]="f.name" [style.fontFamily]="f.name">
+            {{ f.name }}
+          </option>
+        </optgroup>
+
+        <optgroup label="Google Fonts">
+          <option *ngFor="let f of googleFonts" [value]="f.name" [style.fontFamily]="f.name">
+            {{ f.name }}
+          </option>
+        </optgroup>
+
+      </select>
+
+      <input type="color" class="form-control form-control-color form-control-sm" (change)="changeColor($event)"
+        [disabled]="!isPdfLoaded" />
+      <button class="btn btn-outline-danger btn-sm" (click)="deleteSelectedText()" [disabled]="!isPdfLoaded">
+        Delete
+      </button>
+
+      <button class="btn btn-success btn-sm d-flex align-items-center gap-2" (click)="downloadPdf()"
+        [disabled]="!isPdfLoaded || isDownloading">Download
+      </button>
+
+    </div>
+  </nav>
+
+  <!-- 🔽 MAIN CONTENT -->
+  <div class="row flex-grow-1 overflow-hidden m-0">
+
+    <!-- 📑 SIDEBAR -->
+    <div class="col-2 bg-light border-end p-2 overflow-auto h-100">
+      <h6 class="text-muted">Pages</h6>
+
+      <div *ngFor="let page of pages; let i = index" class="card mb-2 p-1 cursor-pointer"
+        [class.border-primary]="selectedPageIndex === i" (click)="selectPage(i)">
+
+        <small class="text-center">Page {{ i + 1 }}</small>
+      </div>
+    </div>
+
+    <!-- 📄 MAIN PDF VIEW -->
+    <div class="col-10 bg-secondary bg-opacity-10 p-3 overflow-auto h-100">
+      <div #pageContainer class="pdf-container"></div>
+    </div>
+
+  </div>
+
+</div>
